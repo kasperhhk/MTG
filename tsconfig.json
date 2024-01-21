@@ -1,0 +1,9 @@
+{
+  "compileOnSave": true,
+  "include": ["./*.ts"],
+  "compilerOptions": {
+    "target": "ES5",
+    "lib": ["ES2017", "DOM"],
+    "moduleResolution": "node",
+  }
+}
