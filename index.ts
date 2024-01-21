@@ -1,5 +1,5 @@
 import * as readlineSync from 'readline-sync';
-import { GameState, Player } from './gametypes';
+import { GameState, Hand, Player } from './gametypes';
 import { getCommands } from './playercommands';
 
 const player1name = readlineSync.question('Name of player1? ');
@@ -10,8 +10,8 @@ const player2name = readlineSync.question('Name of player2? ');
 if (player2name == '')
   throw 'invalid name';
 
-const player1 = new Player(player1name);
-const player2 = new Player(player2name);
+const player1 = new Player(player1name, Hand.default());
+const player2 = new Player(player2name, Hand.default());
 
 function GetPlayerOrder(player1: Player, player2: Player) {
   const startingPlayer = readlineSync.keyInSelect([player1name, player2name], 'Who will start?', { cancel: false });
