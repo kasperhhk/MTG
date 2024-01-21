@@ -37,7 +37,11 @@ export abstract class Card implements GameObject {
     this.id = nextId();
   }
 
-  abstract inspect(gamestate: GameState, player: Player): void;
+  inspect(gamestate: GameState, player: Player): void {
+    if (player.hand.cards.find(_ => _ === this)) {
+      console.log(`This is your card, it is in your hand`);
+    }
+  }
 
   abstract resolve(castingState: Spell, gamestate: GameState): void;
 }
@@ -63,10 +67,7 @@ export class LightningBolt extends Card {
 
   inspect(gamestate: GameState, player: Player): void {
     console.log(`${this.name} [${this.cardType}]: Deal 3 damage to any taget`);
-    
-    if (player.hand.cards.find(_ => _ === this)) {
-      console.log(`This is your card, it is in your hand`);
-    }
+    super.inspect(gamestate, player);
   }
 
   resolve(castingState: Spell, gamestate: GameState): void {
@@ -75,6 +76,39 @@ export class LightningBolt extends Card {
 
     target.life -= 3;
     console.log(`${castingState.caster.name} casts ${this.name} at ${target.name} for 3 damage`);
+  }
+}
+
+export class WeirdBolt extends Card {
+  constructor() {
+    super('Weird Bolt', CardType.Instant, [{
+      type: TargetingType.Any,
+      min: 1,
+      max: 1
+    }, {
+      type: TargetingType.Any,
+      min: 0,
+      max: 2
+    }]);
+  }
+
+  inspect(gamestate: GameState, player: Player): void {
+    console.log(`${this.name} [${this.cardType}]: Deal 1 damage to any target. Then deal 5 damage to up to two targets.`);
+    super.inspect(gamestate, player);
+  }
+
+  resolve(castingState: Spell, gamestate: GameState): void {
+    const [first, second] = castingState.targets;
+    
+    const firstplayer = first.selected[0] as Player;
+    firstplayer.life -= 1;
+    console.log(`${this.name} deals 1 damage to ${firstplayer.name}`);
+
+    for (let st of second.selected) {
+      const sp = st as Player;
+      sp.life -= 5;
+      console.log(`${this.name} deals 5 damage to ${sp.name}`);
+    }
   }
 }
 
@@ -101,7 +135,7 @@ export class Player implements GameObject {
 }
 
 export class Hand {
-  static default() { return new Hand(new Array(3).fill(0).map(_ => new LightningBolt())); }
+  static default() { return new Hand(new Array(3).fill(0).map(_ => new WeirdBolt())); }
 
   constructor(public cards: Card[]) {}
 
