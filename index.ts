@@ -39,12 +39,22 @@ while (!gamestate.gameover && gamestate.turn[0] < maxrounds) {
 
   while (gamestate.history.length < 2 
     || !(gamestate.history[gamestate.history.length-1] === 'pass' 
-    && gamestate.history[gamestate.history.length-2] === 'pass')) {
+    && gamestate.history[gamestate.history.length-2] === 'pass' && gamestate.stack.length === 0)) {
 
       const priorityPlayer = gamestate.players[gamestate.hasPriority];
       console.log(`${priorityPlayer.name} has priority`);
       readlineSync.promptCLLoop(getCommands(gamestate, priorityPlayer));
+
+      if (gamestate.stack.length 
+        && gamestate.history.length >= 2
+        && gamestate.history[gamestate.history.length-1] === 'pass' 
+        && gamestate.history[gamestate.history.length-2] === 'pass') {
+
+        gamestate.resolvestack();
+        gamestate.resetPriority();
+      }
   }
 
+  console.log(`both players pass on empty stack, ending turn`);
   gamestate.nextTurn();
 }
