@@ -8,7 +8,8 @@ const nextId = (() => {
 
 export enum ObjectType {
   Player = 'Player',
-  Card = 'Card'
+  Card = 'Card',
+  Spell = "Spell"
 }
 
 export enum CardType {
@@ -25,7 +26,7 @@ export interface Inspectable {
   inspect(gamestate: GameState, player: Player): void;
 }
 
-export class Card implements GameObject {
+export abstract class Card implements GameObject {
   public id: string;
 
   public type = ObjectType.Card;
@@ -34,12 +35,30 @@ export class Card implements GameObject {
     this.id = nextId();
   }
 
+  abstract inspect(gamestate: GameState, player: Player): void;
+
+  abstract resolve(castingState: CastingState, gamestate: GameState): void;
+}
+
+export class LightningBolt extends Card {
+  constructor() {
+    super('Lightning Bolt', CardType.Instant);
+  }
+
   inspect(gamestate: GameState, player: Player): void {
-    console.log(`${this.name} [${this.cardType}]: Deal 3 damage to the opponents face`);
+    console.log(`${this.name} [${this.cardType}]: Deal 3 damage to any taget`);
     
     if (player.hand.cards.find(_ => _ === this)) {
       console.log(`This is your card, it is in your hand`);
     }
+  }
+
+  resolve(castingState: CastingState, gamestate: GameState): void {
+    const target = castingState.targets[0] as Player;
+    if (!target) throw 'invalid target';
+
+    target.life -= 3;
+    console.log(`${castingState.caster.name} casts ${this.name} at ${target.name} for 3 damage`);
   }
 }
 
@@ -66,7 +85,7 @@ export class Player implements GameObject {
 }
 
 export class Hand {
-  static default() { return new Hand(new Array(3).fill(0).map(_ => new Card('bolt', CardType.Instant))); }
+  static default() { return new Hand(new Array(3).fill(0).map(_ => new LightningBolt())); }
 
   constructor(public cards: Card[]) {}
 
@@ -75,14 +94,33 @@ export class Hand {
   }
 }
 
+export class CastingState implements GameObject {
+  public targets: GameObject[];
+  public id: string;
+  public get name(): string { return this.card.name; }
+  public type = ObjectType.Spell;
+
+  constructor(public card: Card, public caster: Player) {
+    this.targets = [];
+    this.id = nextId();
+  }
+
+  inspect(gamestate: GameState, player: Player): void {
+    console.log(`${this.card.id}: ${this.card.name} [${this.card.type}] cast by (${this.caster.id})${this.caster.name}`);
+    if (this.targets.length) {
+      console.log(`it has the following targets:\n\t${this.targets.map(_ => `${_.id}: ${_.name} [${_.type}]`).join('\n\t')}\n`);
+    }
+  }
+}
+
 export class GameState {
   public board: Board;
   public gameover: boolean;
   public history: string[];
   public turn: [number, number];
-  public stack: { card: Card, caster: Player, target: Player }[];
+  public stack: CastingState[];
 
-  public casting?: any;
+  public casting?: CastingState;
 
   public currentPlayer: number;
   public hasPriority: number;
@@ -118,22 +156,25 @@ export class GameState {
     this.hasPriority = this.currentPlayer;
   }
 
-  putonstack(card: Card, caster: Player, target: Player) {
-    this.stack.push({ card, caster, target });
+  cancelCasting() {
+    console.log(`${this.casting.caster} cancels casting ${this.casting.card.name}`);
+    this.casting = null;
+  }
+
+  castSpell() {
+    console.log(`${this.casting.caster.name} casts ${this.casting.card.name} targeting (${this.casting.targets[0].id})${this.casting.targets[0].name}, it is now on the stack`);
+    this.casting.caster.hand.removeCard(this.casting.card);
+    this.stack.push(this.casting);
+    this.casting = null;
+    this.history.push('cast');
   }
 
   resolvestack() {
     const topofstack = this.stack.pop();
     if (topofstack === undefined) throw 'resolved empty stack';
 
-    if (topofstack.card.name === 'bolt') {
-      console.log(`${topofstack.caster.name} Lightning Bolts ${topofstack.target.name} for 3 damage`);
-      topofstack.target.life -= 3;
-      this.history.push('bolt');
-    }
-    else {
-      throw 'unknown stack card';
-    }
+    topofstack.card.resolve(topofstack, this);
+    this.history.push(topofstack.card.name);
   }
 }
 

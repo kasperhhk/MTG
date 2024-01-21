@@ -1,4 +1,4 @@
-import { GameState, Player } from '../gametypes';
+import { CastingState, GameState, Player } from '../gametypes';
 
 export function createCastCommand(gamestate: GameState, player: Player) {
   return (cardId: string) => {
@@ -9,7 +9,7 @@ export function createCastCommand(gamestate: GameState, player: Player) {
     }
 
     console.log(`you begin casting ${card.name}, you must now choose targets using the 'target' command`);
-    gamestate.casting = { card, targets: [] };
+    gamestate.casting = new CastingState(card, player);
     return true;
   };
 }
@@ -24,20 +24,17 @@ export function createConfirmCastCommand(gamestate: GameState, player: Player) {
       return;
     }
 
-    player.hand.removeCard(card);
-    gamestate.putonstack(card, player, targets[0])
-    gamestate.history.push('cast');
-    gamestate.casting = null;
-    console.log(`you cast ${card.name} targeting (${targets[0].id})${targets[0].name}, it is now on the stack`);
+    gamestate.castSpell();
+    
     return true;
   };
 }
 
 export function createCancelCastCommand(gamestate: GameState, player: Player) {
   return () => {
-    const card = gamestate.casting.card;
-    gamestate.casting = null;
-    console.log(`you cancel casting ${card.name}`);
+
+    gamestate.cancelCasting();
+    
     return true;
   };
 }
