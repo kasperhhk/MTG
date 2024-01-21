@@ -1,6 +1,6 @@
 {
   "compileOnSave": true,
-  "include": ["./*.ts"],
+  "include": ["./src/**/*.ts"],
   "compilerOptions": {
     "target": "ES5",
     "lib": ["ES2017", "DOM"],

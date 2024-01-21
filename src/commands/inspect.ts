@@ -1,4 +1,4 @@
-import { GameState, Player } from './gametypes';
+import { GameState, Player } from '../gametypes';
 
 const inspectCommands = {
   help: (gamestate: GameState, player: Player) => inspectHelp(),
@@ -33,7 +33,7 @@ function inspectHand(player: Player) {
   console.log(`Cards in hand:\n\t${cstr.join('\n\t')}\n`);
 }
 
-function createInspectCommand(gamestate: GameState, player: Player) {
+export function createInspectCommand(gamestate: GameState, player: Player) {
   return (arg?: string) => {
     if (Object.keys(inspectCommands).includes(arg)) {
       inspectCommands[arg](gamestate, player);
@@ -43,33 +43,6 @@ function createInspectCommand(gamestate: GameState, player: Player) {
     }
     else {
       inspectObject(gamestate, player, arg);
-    }
-  };
-}
-
-function createCastCommand(gamestate: GameState, player: Player) {
-  return (cardId: string) => {
-    const card = player.hand.cards.find(_ => _.id === cardId);
-    if (!card) {
-      console.log(`can't find card with id ${cardId} in hand`);
-      return;
-    }
-
-    console.log(`you cast ${card.name}`);
-    player.hand.cards = player.hand.cards.filter(_ => _ !== card);
-    gamestate.putonstack(card, player, gamestate.players.find(_ => _ !== player));
-    gamestate.history.push('cast');
-  };
-}
-
-export function getCommands(gamestate: GameState, player: Player) {
-  return {
-    inspect: createInspectCommand(gamestate, player),
-    cast: createCastCommand(gamestate, player),
-    pass: () => {
-      gamestate.passPriority();
-      console.log(`${player.name} passes priority`);
-      return true;
     }
   };
 }

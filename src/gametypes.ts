@@ -69,6 +69,10 @@ export class Hand {
   static default() { return new Hand(new Array(3).fill(0).map(_ => new Card('bolt', CardType.Instant))); }
 
   constructor(public cards: Card[]) {}
+
+  removeCard(card: Card) {
+    this.cards = this.cards.filter(_ => _ !== card);
+  }
 }
 
 export class GameState {
@@ -77,6 +81,8 @@ export class GameState {
   public history: string[];
   public turn: [number, number];
   public stack: { card: Card, caster: Player, target: Player }[];
+
+  public casting?: any;
 
   public currentPlayer: number;
   public hasPriority: number;
@@ -89,6 +95,11 @@ export class GameState {
     this.hasPriority = 0;
     this.turn = [1, 0];
     this.stack = [];
+    this.casting = null;
+  }
+
+  getOpponent(player: Player): Player {
+    return this.players.find(_ => _ !== player)
   }
 
   nextTurn() {
