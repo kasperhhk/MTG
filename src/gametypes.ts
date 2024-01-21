@@ -31,18 +31,34 @@ export abstract class Card implements GameObject {
 
   public type = ObjectType.Card;
 
-  constructor(public name: string, public cardType: CardType) {
+  ;
+
+  constructor(public name: string, public cardType: CardType, public targetinginfo: TargetingInfo[]) {
     this.id = nextId();
   }
 
   abstract inspect(gamestate: GameState, player: Player): void;
 
-  abstract resolve(castingState: CastingState, gamestate: GameState): void;
+  abstract resolve(castingState: Spell, gamestate: GameState): void;
+}
+
+export enum TargetingType {
+  Any = "Any"
+}
+
+export interface TargetingInfo {
+  type: TargetingType;
+  min: number;
+  max: number;
 }
 
 export class LightningBolt extends Card {
   constructor() {
-    super('Lightning Bolt', CardType.Instant);
+    super('Lightning Bolt', CardType.Instant, [{
+      type: TargetingType.Any,
+      min: 1,
+      max: 1
+    }]);
   }
 
   inspect(gamestate: GameState, player: Player): void {
@@ -53,8 +69,8 @@ export class LightningBolt extends Card {
     }
   }
 
-  resolve(castingState: CastingState, gamestate: GameState): void {
-    const target = castingState.targets[0] as Player;
+  resolve(castingState: Spell, gamestate: GameState): void {
+    const target = castingState.targets[0].selected[0] as Player;
     if (!target) throw 'invalid target';
 
     target.life -= 3;
@@ -94,21 +110,86 @@ export class Hand {
   }
 }
 
-export class CastingState implements GameObject {
-  public targets: GameObject[];
+export interface TargetSelection {
+  info: TargetingInfo;
+  selected: GameObject[];
+}
+
+function isValidTargets(targets: TargetSelection) {
+  if (targets.selected.length < targets.info.min)
+    return false;
+
+  if (targets.selected.length > targets.info.max)
+    return false;
+
+  return targets.selected.every(_ => isValidType(_, targets.info.type));
+}
+
+function isValidType(obj: GameObject, type: TargetingType) {
+  if (type === TargetingType.Any)
+    return obj instanceof Player;
+}
+
+export class CastingState {
+  public targets: TargetSelection[];
+
+  constructor(public card: Card, public caster: Player) {
+    this.targets = card.targetinginfo.length ? [{ info: card.targetinginfo[0], selected: [] }] : [];
+  }
+
+  getCurrentSelection() {
+    if (this.card.targetinginfo.length)
+      return this.targets[this.targets.length - 1];
+    return null;
+  }
+
+  confirmCurrentSelection() {
+    if (this.card.targetinginfo.length === 0)
+      return true;
+
+    const current = this.getCurrentSelection();
+    if (!isValidTargets(current))
+      return false;
+
+    if (this.targets.length < this.card.targetinginfo.length) {
+      this.targets.push({ info: this.card.targetinginfo[this.targets.length], selected: [] });
+      return true;
+    }
+
+    return true;
+  }
+
+  isValid() {
+    return this.targets.every(_ => isValidTargets(_));
+  }
+
+  canTarget(selection: TargetSelection, target: GameObject) {
+    return isValidType(target, selection.info.type);
+  }
+
+  undoTargets() {
+    if (this.targets.length === 1) {
+      this.targets[0].selected = [];
+    }
+    else {
+      this.targets.pop();
+    }
+  }
+}
+
+export class Spell implements GameObject {
   public id: string;
   public get name(): string { return this.card.name; }
   public type = ObjectType.Spell;
 
-  constructor(public card: Card, public caster: Player) {
-    this.targets = [];
+  constructor(public card: Card, public caster: Player, public targets: TargetSelection[]) {
     this.id = nextId();
   }
 
   inspect(gamestate: GameState, player: Player): void {
     console.log(`${this.card.id}: ${this.card.name} [${this.card.type}] cast by (${this.caster.id})${this.caster.name}`);
     if (this.targets.length) {
-      console.log(`it has the following targets:\n\t${this.targets.map(_ => `${_.id}: ${_.name} [${_.type}]`).join('\n\t')}\n`);
+      console.log(`it has the following targets:\n\t${this.targets.flatMap(_ => _.selected).map(_ => `${_.id}: ${_.name} [${_.type}]`).join('\n\t')}\n`);
     }
   }
 }
@@ -118,7 +199,7 @@ export class GameState {
   public gameover: boolean;
   public history: string[];
   public turn: [number, number];
-  public stack: CastingState[];
+  public stack: Spell[];
 
   public casting?: CastingState;
 
@@ -157,14 +238,14 @@ export class GameState {
   }
 
   cancelCasting() {
-    console.log(`${this.casting.caster} cancels casting ${this.casting.card.name}`);
+    console.log(`${this.casting.caster.name} cancels casting ${this.casting.card.name}`);
     this.casting = null;
   }
 
   castSpell() {
-    console.log(`${this.casting.caster.name} casts ${this.casting.card.name} targeting (${this.casting.targets[0].id})${this.casting.targets[0].name}, it is now on the stack`);
+    console.log(`${this.casting.caster.name} casts ${this.casting.card.name} targeting:\n\t${this.casting.targets.flatMap(_ => _.selected).map(_ => `${_.id}: ${_.name} [${_.type}]`).join('\n\t')}\n`);
     this.casting.caster.hand.removeCard(this.casting.card);
-    this.stack.push(this.casting);
+    this.stack.push(new Spell(this.casting.card, this.casting.caster, this.casting.targets));
     this.casting = null;
     this.history.push('cast');
   }

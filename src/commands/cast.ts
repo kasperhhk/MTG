@@ -14,27 +14,25 @@ export function createCastCommand(gamestate: GameState, player: Player) {
   };
 }
 
-export function createConfirmCastCommand(gamestate: GameState, player: Player) {
-  return () => {
-    const card = gamestate.casting.card;
-    const targets = gamestate.casting.targets;
-
-    if (targets.length !== 1) {
-      console.log(`you need to have 1 target, you have ${targets.length}`);
-      return;
+export function createCastingCommand(gamestate: GameState, player: Player) {
+  return (command: string) => {
+    if (command === 'confirm') {
+      if (!gamestate.casting.isValid()) {
+        console.log('you are not done selecting targets');
+        return;
+      }
+  
+      gamestate.castSpell();
+      
+      return true;
     }
-
-    gamestate.castSpell();
+    else if (command === 'cancel') {
+      gamestate.cancelCasting();
     
-    return true;
-  };
-}
-
-export function createCancelCastCommand(gamestate: GameState, player: Player) {
-  return () => {
-
-    gamestate.cancelCasting();
-    
-    return true;
+      return true;
+    }
+    else {
+      console.log('cast [confirm|cancel]');
+    }
   };
 }

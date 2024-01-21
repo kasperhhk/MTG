@@ -3,7 +3,7 @@
   "include": ["./src/**/*.ts"],
   "compilerOptions": {
     "target": "ES5",
-    "lib": ["ES2017", "DOM"],
+    "lib": ["ES2019", "ES2017", "DOM"],
     "moduleResolution": "node",
     "outDir": "./out"
   }

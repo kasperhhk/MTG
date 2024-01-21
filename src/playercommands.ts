@@ -1,4 +1,4 @@
-import { createCancelCastCommand, createCastCommand, createConfirmCastCommand } from './commands/cast';
+import { createCastCommand, createCastingCommand } from './commands/cast';
 import { createInspectCommand } from './commands/inspect';
 import { createPassCommand } from './commands/pass';
 import { createTargetCommand } from './commands/target';
@@ -19,8 +19,7 @@ export function getCommands(gamestate: GameState, player: Player) {
   let commands = defaultCommands;
   if (gamestate.casting) {
     commands['target'] = createTargetCommand(gamestate, player);
-    commands['cancelcast'] = createCancelCastCommand(gamestate, player);
-    commands['confirmcast'] = createConfirmCastCommand(gamestate, player);
+    commands['cast'] = createCastingCommand(gamestate, player);
   }
   else {
     commands['cast'] = createCastCommand(gamestate, player);
