@@ -1,5 +1,6 @@
 import * as readlineSync from 'readline-sync';
 import { GameState, Player } from './gametypes';
+import { getCommands } from './playercommands';
 
 const player1name = readlineSync.question('Name of player1? ');
 if (player1name == '')
@@ -30,8 +31,20 @@ console.log(`${players[0].name} is on the play with ${players[0].life} life`);
 console.log(`${players[1].name} is on the draw with ${players[1].life} life`);
 
 const gamestate = new GameState(players);
+const maxrounds = 20;
 
-/*
-while (!gamestate.gameover) {
+while (!gamestate.gameover && gamestate.turn[0] < maxrounds) {
+  const turnPlayer = gamestate.players[gamestate.currentPlayer];
+  console.log(`\n${turnPlayer.name} turn ${gamestate.turn[gamestate.currentPlayer]}`);
 
-}*/
+  while (gamestate.history.length < 2 
+    || !(gamestate.history[gamestate.history.length-1] === 'pass' 
+    && gamestate.history[gamestate.history.length-2] === 'pass')) {
+
+      const priorityPlayer = gamestate.players[gamestate.hasPriority];
+      console.log(`${priorityPlayer.name} has priority`);
+      readlineSync.promptCLLoop(getCommands(gamestate, priorityPlayer));
+  }
+
+  gamestate.nextTurn();
+}

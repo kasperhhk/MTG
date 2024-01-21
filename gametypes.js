@@ -15,7 +15,7 @@ var Player = /** @class */ (function () {
     function Player(name) {
         this.name = name;
         this.type = ObjectType.Player;
-        this.life = 21;
+        this.life = 20;
         this.id = nextId();
     }
     return Player;
@@ -26,8 +26,21 @@ var GameState = /** @class */ (function () {
         this.players = players;
         this.board = new Board(players);
         this.gameover = false;
+        this.history = [];
         this.currentPlayer = 0;
+        this.hasPriority = 0;
+        this.turn = [1, 0];
     }
+    GameState.prototype.nextTurn = function () {
+        this.currentPlayer ^= 1;
+        this.hasPriority = this.currentPlayer;
+        this.turn[this.currentPlayer]++;
+        this.history.push('turn');
+    };
+    GameState.prototype.passPriority = function () {
+        this.hasPriority ^= 1;
+        this.history.push('pass');
+    };
     return GameState;
 }());
 exports.GameState = GameState;

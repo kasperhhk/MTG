@@ -1,13 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.commands = exports.InspectTargets = void 0;
+exports.getCommands = exports.InspectTargets = void 0;
 var gametypes_1 = require("./gametypes");
 var InspectTargets;
 (function (InspectTargets) {
     InspectTargets[InspectTargets["Board"] = 0] = "Board";
     InspectTargets[InspectTargets["Object"] = 1] = "Object";
 })(InspectTargets || (exports.InspectTargets = InspectTargets = {}));
-function inspect(source, gamestate, target, id) {
+function inspect(gamestate, player, target, id) {
     if (target === InspectTargets.Board) {
         var allObjects = gamestate.board.getAllObjects();
         var ostr = allObjects.map(function (o) { return "".concat(o.id, ": ").concat(o.name, " [").concat(o.type, "]"); });
@@ -20,8 +20,8 @@ function inspect(source, gamestate, target, id) {
         }
         var obj = gamestate.board.getObject(id);
         if (obj instanceof gametypes_1.Player) {
-            console.log("Player ".concat(obj.name, " has ").concat(obj.life));
-            if (obj === source) {
+            console.log("Player ".concat(obj.name, " has ").concat(obj.life, " life"));
+            if (obj === player) {
                 console.log('This is you');
             }
             else {
@@ -33,6 +33,21 @@ function inspect(source, gamestate, target, id) {
         }
     }
 }
-exports.commands = {
-    inspect: inspect
-};
+function createInspectCommand(gamestate, player) {
+    return function (id) {
+        var idnum = id ? parseInt(id) : null;
+        var target = id ? InspectTargets.Object : InspectTargets.Board;
+        inspect(gamestate, player, target, idnum);
+    };
+}
+function getCommands(gamestate, player) {
+    return {
+        inspect: createInspectCommand(gamestate, player),
+        pass: function () {
+            gamestate.passPriority();
+            console.log("".concat(player.name, " passes priority"));
+            return true;
+        }
+    };
+}
+exports.getCommands = getCommands;

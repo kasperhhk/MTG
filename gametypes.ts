@@ -22,7 +22,7 @@ export class Player implements GameObject {
   public type = ObjectType.Player;
 
   constructor(public name: string) {
-    this.life = 21;
+    this.life = 20;
     this.id = nextId();
   }
 }
@@ -31,13 +31,30 @@ export class GameState {
   public board: Board;
   public gameover: boolean;
   public history: any[];
+  public turn: [number, number];
 
   public currentPlayer: number;
+  public hasPriority: number;
 
   constructor(public players: Player[]) {
     this.board = new Board(players);
     this.gameover = false;
+    this.history = [];
     this.currentPlayer = 0;
+    this.hasPriority = 0;
+    this.turn = [1, 0];
+  }
+
+  nextTurn() {
+    this.currentPlayer ^= 1;
+    this.hasPriority = this.currentPlayer;
+    this.turn[this.currentPlayer]++;
+    this.history.push('turn');
+  }
+
+  passPriority() {
+    this.hasPriority ^= 1;
+    this.history.push('pass');
   }
 }
 
