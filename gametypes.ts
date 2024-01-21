@@ -15,10 +15,14 @@ export enum CardType {
   Instant = "Instant"
 }
 
-export interface GameObject {
+export interface GameObject extends Inspectable {
   id: string,
   name: string,
   type: ObjectType
+}
+
+export interface Inspectable {
+  inspect(gamestate: GameState, player: Player): void;
 }
 
 export class Card implements GameObject {
@@ -28,6 +32,14 @@ export class Card implements GameObject {
 
   constructor(public name: string, public cardType: CardType) {
     this.id = nextId();
+  }
+
+  inspect(gamestate: GameState, player: Player): void {
+    console.log(`${this.name} [${this.cardType}]: Deal 3 damage to the opponents face`);
+    
+    if (player.hand.cards.find(_ => _ === this)) {
+      console.log(`This is your card, it is in your hand`);
+    }
   }
 }
 
@@ -40,6 +52,16 @@ export class Player implements GameObject {
   constructor(public name: string, public hand: Hand) {
     this.life = 20;
     this.id = nextId();
+  }
+
+  inspect(gamestate: GameState, player: Player): void {
+    console.log(`Player ${this.name} has ${this.life} life`)
+    if (this === player) {
+      console.log('This is you');
+    }
+    else {
+      console.log('This is your opponent');
+    }
   }
 }
 

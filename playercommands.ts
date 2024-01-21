@@ -1,76 +1,49 @@
 import { GameState, Player } from './gametypes';
 
-export enum InspectType {
-  Help,
-  Board,
-  Hand
+const inspectCommands = {
+  help: (gamestate: GameState, player: Player) => inspectHelp(),
+  board: (gametate: GameState, player: Player) => inspectBoard(gametate),
+  hand: (gamestate: GameState, player: Player) => inspectHand(player)
+};
+
+function inspectHelp() {  
+  console.log(`Usage:\ninspect {id}\ninspect {command}`);
+  console.log(`Commands:\n\t${Object.keys(inspectCommands).join('\n\t')}\n`);
 }
 
-function inspect(gamestate: GameState, player: Player, type: InspectType, target?: string) {
-  if (type === InspectType.Board && !target) {
-    const allObjects = gamestate.board.getAllObjects();
-    const ostr = allObjects.map(o => `${o.id}: ${o.name} [${o.type}]`);
-    console.log(`Objects on the board:\n\t${ostr.join('\n\t')}\n`);
-  }
-  else if (type == InspectType.Board && target) {
-    const obj = gamestate.board.getObject(target);
-    if (!obj) {
-      console.log('Unknown object with id ' + target);
-      return;
-    }
+function inspectObject(gamestate: GameState, player: Player, id: string) {
+  const fromHand = player.hand.cards.find(_ => _.id === id);
+  const fromBoard = gamestate.board.getObject(id);
+  const obj = fromHand ? fromHand : fromBoard;
 
-    if (obj instanceof Player) {
-      console.log(`Player ${obj.name} has ${obj.life} life`)
-      if (obj === player) {
-        console.log('This is you');
-      }
-      else {
-        console.log('This is your opponent');
-      }
-    }
-    else {
-      console.log('Unknown object type ' + obj.type);
-    }
-  }
-  else if (type === InspectType.Hand) {
-    if (target) {
-      const card = player.hand.cards.find(_ => _.id);
-      if (!card) {
-        console.log(`can't find card with id ${target} in hand`);
-        return;
-      }
+  if (obj)
+    obj.inspect(gamestate, player);
+  else
+    console.log(`Could not find object with id ${id}`);
+}
 
-      if (card.name === 'bolt') {
-        console.log(`${card.name} will bolt the opponent in the face for 3 damage`);
-      }
-      else {
-        console.log(`${card.name} is a ${card.type} card in your hand`);
-      }
-    }
-    else {
-      const cstr = player.hand.cards.map(c => `${c.id}: ${c.name} [${c.type}]`);
-      console.log(`Cards in hand:\n\t${cstr.join('\n\t')}\n`);
-    }
-  }
-  else if (type === InspectType.Help) {
-    console.log(`Available inspect targets:\n\tboard\n\thand\n`);
-  }
+function inspectBoard(gamestate: GameState) {
+  const allObjects = gamestate.board.getAllObjects();
+  const ostr = allObjects.map(o => `${o.id}: ${o.name} [${o.type}]`);
+  console.log(`Objects on the board:\n\t${ostr.join('\n\t')}\n`);
+}
+
+function inspectHand(player: Player) {
+  const cstr = player.hand.cards.map(c => `${c.id}: ${c.name} [${c.type}]`);
+  console.log(`Cards in hand:\n\t${cstr.join('\n\t')}\n`);
 }
 
 function createInspectCommand(gamestate: GameState, player: Player) {
-  return (type: string | undefined, target: string | undefined) => {
-    let inspectType: InspectType;
-    if (type === 'board') {
-      inspectType = InspectType.Board;
+  return (arg?: string) => {
+    if (Object.keys(inspectCommands).includes(arg)) {
+      inspectCommands[arg](gamestate, player);
     }
-    else if (type === 'hand') {
-      inspectType = InspectType.Hand;
+    else if (arg === undefined) {
+      inspectHelp();
     }
     else {
-      inspectType = InspectType.Help;
+      inspectObject(gamestate, player, arg);
     }
-
-    inspect(gamestate, player, inspectType, target);
   };
 }
 
