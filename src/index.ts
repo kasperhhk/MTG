@@ -44,7 +44,7 @@ function mainloop() {
 
         const priorityPlayer = gamestate.players[gamestate.hasPriority];
 
-        if (gamestate.history[gamestate.history.length - 1] !== 'cast') {
+        if (!gamestate.casting && gamestate.history[gamestate.history.length - 1] !== 'cast') {
           write(`about to give priority to ${priorityPlayer.name}, doing state-based actions`);
           gamestate.doStateBasedActions();
 
@@ -54,10 +54,10 @@ function mainloop() {
 
           write(`${priorityPlayer.name} has priority`);
         }
-        else {
+        else if (!gamestate.casting) {
           write(`${priorityPlayer.name} held priority after casting a spell`);
         }
-        
+
         readlineSync.promptCLLoop(getCommands(gamestate, priorityPlayer));
 
         if (gamestate.stack.length 

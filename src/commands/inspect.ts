@@ -3,6 +3,7 @@ import { list, write } from '../output/util';
 
 const inspectCommands = {
   help: (gamestate: GameState, player: Player) => inspectHelp(),
+  players: (gamestate: GameState, player: Player, id: string) => inspectPlayers(gamestate, player, id),
   board: (gametate: GameState, player: Player) => inspectBoard(gametate),
   hand: (gamestate: GameState, player: Player) => inspectHand(player),
   stack: (gamestate: GameState, player: Player) => inspectStack(gamestate),
@@ -11,6 +12,7 @@ const inspectCommands = {
 
 const inspectHelpStrings = {
   help: 'help\t\t\t\tview usage help',
+  players: 'players [me|opponent|id]\tlist all players or information about specific player',
   board: 'board\t\t\t\tlist all objects on the board, including players',
   hand: 'hand\t\t\t\tlist all cards in your hand',
   stack: 'stack\t\t\t\tlist all spells on the stack from top to bottom',
@@ -31,13 +33,35 @@ function inspectObject(gamestate: GameState, player: Player, id: string) {
   const cardFromStack = gamestate.stack.find(_ => _.card.id === id)?.card;
   const fromMyGraveyard = player.graveyard.cards.find(_ => _.id === id);
   const fromOppGraveyard = gamestate.getOpponent(player).graveyard.cards.find(_ => _.id === id);
+  const fromPlayers = gamestate.players.find(_ => _.id === id);
   
-  const obj = fromHand ?? fromBoard ?? fromStack ?? cardFromStack ?? fromMyGraveyard ?? fromOppGraveyard;
+  const obj = fromHand ?? fromBoard ?? fromStack ?? cardFromStack ?? fromMyGraveyard ?? fromOppGraveyard ?? fromPlayers;
 
   if (obj)
     obj.inspect(gamestate, player);
   else
     write(`Could not find object with id ${id}`);
+}
+
+function inspectPlayers(gamestate: GameState, player: Player, id?: string) {
+  if (id === 'me') {
+    player.inspect(gamestate, player);
+  }
+  else if (id === 'opponent') {
+    gamestate.getOpponent(player).inspect(gamestate, player);
+  }
+  else if (id !== undefined) {
+    const playerById = gamestate.players.find(_ => _.id === id);
+    if (playerById) {
+      playerById.inspect(gamestate, player);
+    }
+    else {
+      write(`player with id ${id} not found`);
+    }
+  }
+  else {
+    list(`Players:`, gamestate.players.map(p => p.toLongString() + (p === player ? ' (me)' : '')));
+  }
 }
 
 function inspectGraveyard(gamestate: GameState, player: Player, id?: string) {

@@ -15,7 +15,8 @@ export enum ObjectType {
 }
 
 export enum CardType {
-  Instant = "Instant"
+  Instant = 'Instant',
+  Creature = 'Creature'
 }
 
 export interface GameObject extends Inspectable {
@@ -41,16 +42,20 @@ function defaultShortString(obj: GameObject) {
 export abstract class Card implements GameObject {
   public id: string;
   public type = ObjectType.Card;
+  public owner: Player;
 
   constructor(public name: string, public cardType: CardType, public targetinginfo: TargetingInfo[]) {
     this.id = nextId();
   }
 
   inspect(gamestate: GameState, player: Player): void {
+    write(`${this.name} [${this.cardType}]: ${this.getDescription()}`);
     if (player.hand.cards.find(_ => _ === this)) {
       write(`This is your card, it is in your hand`);
     }
   }
+
+  abstract getDescription(): string;
 
   toLongString(): string {
     return defaultLongString(this);
@@ -82,9 +87,8 @@ export class LightningBolt extends Card {
     }]);
   }
 
-  inspect(gamestate: GameState, player: Player): void {
-    write(`${this.name} [${this.cardType}]: Deal 3 damage to any taget`);
-    super.inspect(gamestate, player);
+  getDescription(): string {
+    return 'Deal 3 damage to any taget';
   }
 
   resolve(castingState: Spell, gamestate: GameState): void {
@@ -109,9 +113,8 @@ export class WeirdBolt extends Card {
     }]);
   }
 
-  inspect(gamestate: GameState, player: Player): void {
-    write(`${this.name} [${this.cardType}]: Deal 1 damage to any target. Then deal 5 damage to up to two targets.`);
-    super.inspect(gamestate, player);
+  getDescription(): string {
+    return 'Deal 1 damage to any target. Then deal 5 damage to up to two targets';
   }
 
   resolve(castingState: Spell, gamestate: GameState): void {
@@ -126,6 +129,21 @@ export class WeirdBolt extends Card {
       sp.life -= 5;
       write(`${this.name} deals 5 damage to ${sp.name}`);
     }
+  }
+}
+
+export class GrizzlyBear extends Card {
+  constructor() {
+    super('Grizzly Bear', CardType.Creature, []);
+  }
+
+  getDescription(): string {
+    return '2/2 bear';
+  }
+
+  resolve(castingState: Spell, gamestate: GameState): void {
+    gamestate.board.placeCard(castingState.card);
+    write(`put a 2/2 ${this.name} on the board under the control of ${castingState.caster.toShortString()}`);
   }
 }
 
@@ -148,6 +166,10 @@ export class Player implements GameObject {
     this.life = 20;
     this.id = nextId();
     this.graveyard = new Graveyard(this);
+
+    for (let hcard of hand.cards) {
+      hcard.owner = this;
+    }
   }
 
   inspect(gamestate: GameState, player: Player): void {
@@ -170,7 +192,7 @@ export class Player implements GameObject {
 }
 
 export class Hand {
-  static default() { return new Hand(new Array(3).fill(0).map(_ => new WeirdBolt())); }
+  static default() { return new Hand([new LightningBolt(), new LightningBolt(), new GrizzlyBear()]); }
 
   constructor(public cards: Card[]) {}
 
@@ -358,18 +380,33 @@ export class GameState {
 
 export class Board {
   private objectMap: { [key: string]: GameObject };
+  private objects: GameObject[];
 
   constructor(players: Player[]) {
     this.objectMap = {};
-    this.objectMap[players[0].id] = players[0];
-    this.objectMap[players[1].id] = players[1];
+    this.objects = [];
   }
 
   getAllObjects(): GameObject[] {
-    return Object.values(this.objectMap);
+    return this.objects.map(_ => _);
   }
 
   getObject(id: string): GameObject | undefined {
     return this.objectMap[id];
+  }
+
+  placeCard(card: Card) {
+    if (card.cardType === CardType.Creature) {
+      this.objects.push(card);
+      this.objectMap[card.id] = card;
+    }
+    else {
+      throw 'invalid cardtype, can\'t place ' + card.cardType + ' on the board';
+    }
+  }
+
+  remove(object: GameObject) {
+    delete this.objectMap[object.id];
+    this.objects = this.objects.filter(_ => _ !== object);
   }
 }
