@@ -129,15 +129,25 @@ export class WeirdBolt extends Card {
   }
 }
 
+export class Graveyard {
+  public cards: Card[];
+
+  constructor(public player: Player) {
+    this.cards = [];
+  }
+}
+
 export class Player implements GameObject {
   public life: number;
   public id: string;
 
   public type = ObjectType.Player;
+  public graveyard: Graveyard;
 
   constructor(public name: string, public hand: Hand) {
     this.life = 20;
     this.id = nextId();
+    this.graveyard = new Graveyard(this);
   }
 
   inspect(gamestate: GameState, player: Player): void {
