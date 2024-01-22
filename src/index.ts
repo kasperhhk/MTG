@@ -1,6 +1,7 @@
 import * as readlineSync from 'readline-sync';
 import { GameState, Hand, Player } from './gametypes';
 import { getCommands } from './playercommands';
+import { write } from './output/util';
 
 const player1name = readlineSync.question('Name of player1? ');
 if (player1name == '')
@@ -27,34 +28,57 @@ function GetPlayerOrder(player1: Player, player2: Player) {
 
 const players = GetPlayerOrder(player1, player2);
 
-console.log(`${players[0].name} is on the play with ${players[0].life} life`);
-console.log(`${players[1].name} is on the draw with ${players[1].life} life`);
+write(`${players[0].name} is on the play with ${players[0].life} life`);
+write(`${players[1].name} is on the draw with ${players[1].life} life`);
 
 const gamestate = new GameState(players);
-const maxrounds = 20;
 
-while (!gamestate.gameover && gamestate.turn[0] < maxrounds) {
-  const turnPlayer = gamestate.players[gamestate.currentPlayer];
-  console.log(`\n${turnPlayer.name} turn ${gamestate.turn[gamestate.currentPlayer]}`);
+function mainloop() {
+  while (!gamestate.gameover) {
+    const turnPlayer = gamestate.players[gamestate.currentPlayer];
+    write(`\n${turnPlayer.name} turn ${gamestate.turn[gamestate.currentPlayer]}`);
 
-  while (gamestate.history.length < 2 
-    || !(gamestate.history[gamestate.history.length-1] === 'pass' 
-    && gamestate.history[gamestate.history.length-2] === 'pass' && gamestate.stack.length === 0)) {
+    while (gamestate.history.length < 2 
+      || !(gamestate.history[gamestate.history.length-1] === 'pass' 
+      && gamestate.history[gamestate.history.length-2] === 'pass' && gamestate.stack.length === 0)) {
 
-      const priorityPlayer = gamestate.players[gamestate.hasPriority];
-      console.log(`${priorityPlayer.name} has priority`);
-      readlineSync.promptCLLoop(getCommands(gamestate, priorityPlayer));
+        const priorityPlayer = gamestate.players[gamestate.hasPriority];
+        write(`about to give priority to ${priorityPlayer.name}, doing state-based actions`);
+        gamestate.doStateBasedActions();
 
-      if (gamestate.stack.length 
-        && gamestate.history.length >= 2
-        && gamestate.history[gamestate.history.length-1] === 'pass' 
-        && gamestate.history[gamestate.history.length-2] === 'pass') {
+        if (gamestate.gameover) {
+          return;
+        }
 
-        gamestate.resolvestack();
-        gamestate.resetPriority();
-      }
+        write(`${priorityPlayer.name} has priority`);
+        readlineSync.promptCLLoop(getCommands(gamestate, priorityPlayer));
+
+        if (gamestate.stack.length 
+          && gamestate.history.length >= 2
+          && gamestate.history[gamestate.history.length-1] === 'pass' 
+          && gamestate.history[gamestate.history.length-2] === 'pass') {
+
+          gamestate.resolvestack();
+          gamestate.resetPriority();
+        }
+    }
+
+    write(`both players pass on empty stack, ending turn`);
+    gamestate.nextTurn();
   }
+}
 
-  console.log(`both players pass on empty stack, ending turn`);
-  gamestate.nextTurn();
+mainloop();
+
+if (gamestate.gameover) {
+  if (gamestate.gameover.draw) {
+    write(`both players lost, it's a draw!`);
+  }
+  else {
+    write(`${gamestate.gameover.winner.name} won!`);
+    write(`${gamestate.gameover.loser.name} lost...`);
+  }
+}
+else {
+  write(`game ended without any winner, loser or draw :|`);
 }

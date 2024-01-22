@@ -1,4 +1,5 @@
 import { GameState, Player } from '../gametypes';
+import { list, write } from '../output/util';
 
 const inspectCommands = {
   help: (gamestate: GameState, player: Player) => inspectHelp(),
@@ -8,8 +9,8 @@ const inspectCommands = {
 };
 
 function inspectHelp() {  
-  console.log(`Usage:\ninspect {id}\ninspect {command}`);
-  console.log(`Commands:\n\t${Object.keys(inspectCommands).join('\n\t')}\n`);
+  write(`Usage:\ninspect {id}\ninspect {command}`);
+  list(`Commands:`, Object.keys(inspectCommands));
 }
 
 function inspectObject(gamestate: GameState, player: Player, id: string) {
@@ -23,27 +24,26 @@ function inspectObject(gamestate: GameState, player: Player, id: string) {
   if (obj)
     obj.inspect(gamestate, player);
   else
-    console.log(`Could not find object with id ${id}`);
+    write(`Could not find object with id ${id}`);
 }
 
 function inspectBoard(gamestate: GameState) {
   const allObjects = gamestate.board.getAllObjects();
-  const ostr = allObjects.map(o => `${o.id}: ${o.name} [${o.type}]`);
-  console.log(`Objects on the board:\n\t${ostr.join('\n\t')}\n`);
+  list(`Objects on the board:`, allObjects.map(o => o.toLongString()));
 }
 
 function inspectHand(player: Player) {
-  const cstr = player.hand.cards.map(c => `${c.id}: ${c.name} [${c.type}]`);
-  console.log(`Cards in hand:\n\t${cstr.join('\n\t')}\n`);
+  const cards = player.hand.cards.map(c => c.toLongString());
+  list(`Cards in hand:`, cards);
 }
 
 function inspectStack(gamestate: GameState) {
   if (gamestate.stack.length) {
-    const sstr = gamestate.stack.map(_ => `${_.id}: ${_.name} [${_.type}]`).reverse();
-    console.log(`Stack (from top to bottom):\n\t${sstr.join('\n\t')}\n`);
+    const stack = gamestate.stack.map(_ => _.toLongString()).reverse();
+    list(`Stack (from top to bottom):`, stack);
   }
   else {
-    console.log('The stack is empty');
+    write('The stack is empty');
   }
 }
 

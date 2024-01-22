@@ -1,3 +1,5 @@
+import { list, write } from './output/util';
+
 const nextId = (() => {
   let idgen = 0;
   return () => {
@@ -24,14 +26,21 @@ export interface GameObject extends Inspectable {
 
 export interface Inspectable {
   inspect(gamestate: GameState, player: Player): void;
+  toLongString(): string;
+  toShortString(): string;
+}
+
+function defaultLongString(obj: GameObject) {
+  return `${obj.id}: ${obj.name} [${obj.type}]`;
+}
+
+function defaultShortString(obj: GameObject) {
+  return `${obj.name}(${obj.id})`;
 }
 
 export abstract class Card implements GameObject {
   public id: string;
-
   public type = ObjectType.Card;
-
-  ;
 
   constructor(public name: string, public cardType: CardType, public targetinginfo: TargetingInfo[]) {
     this.id = nextId();
@@ -39,8 +48,16 @@ export abstract class Card implements GameObject {
 
   inspect(gamestate: GameState, player: Player): void {
     if (player.hand.cards.find(_ => _ === this)) {
-      console.log(`This is your card, it is in your hand`);
+      write(`This is your card, it is in your hand`);
     }
+  }
+
+  toLongString(): string {
+    return defaultLongString(this);
+  }
+
+  toShortString(): string {
+    return defaultShortString(this);
   }
 
   abstract resolve(castingState: Spell, gamestate: GameState): void;
@@ -66,7 +83,7 @@ export class LightningBolt extends Card {
   }
 
   inspect(gamestate: GameState, player: Player): void {
-    console.log(`${this.name} [${this.cardType}]: Deal 3 damage to any taget`);
+    write(`${this.name} [${this.cardType}]: Deal 3 damage to any taget`);
     super.inspect(gamestate, player);
   }
 
@@ -75,7 +92,7 @@ export class LightningBolt extends Card {
     if (!target) throw 'invalid target';
 
     target.life -= 3;
-    console.log(`${castingState.caster.name} casts ${this.name} at ${target.name} for 3 damage`);
+    write(`${castingState.caster.name} casts ${this.name} at ${target.name} for 3 damage`);
   }
 }
 
@@ -93,7 +110,7 @@ export class WeirdBolt extends Card {
   }
 
   inspect(gamestate: GameState, player: Player): void {
-    console.log(`${this.name} [${this.cardType}]: Deal 1 damage to any target. Then deal 5 damage to up to two targets.`);
+    write(`${this.name} [${this.cardType}]: Deal 1 damage to any target. Then deal 5 damage to up to two targets.`);
     super.inspect(gamestate, player);
   }
 
@@ -102,12 +119,12 @@ export class WeirdBolt extends Card {
     
     const firstplayer = first.selected[0] as Player;
     firstplayer.life -= 1;
-    console.log(`${this.name} deals 1 damage to ${firstplayer.name}`);
+    write(`${this.name} deals 1 damage to ${firstplayer.name}`);
 
     for (let st of second.selected) {
       const sp = st as Player;
       sp.life -= 5;
-      console.log(`${this.name} deals 5 damage to ${sp.name}`);
+      write(`${this.name} deals 5 damage to ${sp.name}`);
     }
   }
 }
@@ -124,13 +141,21 @@ export class Player implements GameObject {
   }
 
   inspect(gamestate: GameState, player: Player): void {
-    console.log(`Player ${this.name} has ${this.life} life`)
+    write(`Player ${this.name} has ${this.life} life`)
     if (this === player) {
-      console.log('This is you');
+      write('This is you');
     }
     else {
-      console.log('This is your opponent');
+      write('This is your opponent');
     }
+  }
+
+  toLongString(): string {
+    return defaultLongString(this);
+  }
+
+  toShortString(): string {
+    return defaultShortString(this);
   }
 }
 
@@ -221,16 +246,30 @@ export class Spell implements GameObject {
   }
 
   inspect(gamestate: GameState, player: Player): void {
-    console.log(`${this.card.id}: ${this.card.name} [${this.card.type}] cast by (${this.caster.id})${this.caster.name}`);
+    write(`${this.toLongString()} cast by ${this.caster.toShortString()}`);
     if (this.targets.length) {
-      console.log(`it has the following targets:\n\t${this.targets.flatMap(_ => _.selected).map(_ => `${_.id}: ${_.name} [${_.type}]`).join('\n\t')}\n`);
+      list(`it has the following targets:`, this.targets.flatMap(_ => _.selected.map(__ => __.toLongString())));
     }
   }
+
+  toLongString(): string {
+    return defaultLongString(this);
+  }
+
+  toShortString(): string {
+    return defaultShortString(this);
+  }
+}
+
+export interface GameOverState {
+  winner?: Player;
+  loser?: Player;
+  draw?: boolean;
 }
 
 export class GameState {
   public board: Board;
-  public gameover: boolean;
+  public gameover: GameOverState | false;
   public history: string[];
   public turn: [number, number];
   public stack: Spell[];
@@ -272,12 +311,12 @@ export class GameState {
   }
 
   cancelCasting() {
-    console.log(`${this.casting.caster.name} cancels casting ${this.casting.card.name}`);
+    write(`${this.casting.caster.name} cancels casting ${this.casting.card.name}`);
     this.casting = null;
   }
 
   castSpell() {
-    console.log(`${this.casting.caster.name} casts ${this.casting.card.name} targeting:\n\t${this.casting.targets.flatMap(_ => _.selected).map(_ => `${_.id}: ${_.name} [${_.type}]`).join('\n\t')}\n`);
+    list(`${this.casting.caster.name} casts ${this.casting.card.name} targeting:`, this.casting.targets.flatMap(_ => _.selected.map(__ => __.toLongString())));
     this.casting.caster.hand.removeCard(this.casting.card);
     this.stack.push(new Spell(this.casting.card, this.casting.caster, this.casting.targets));
     this.casting = null;
@@ -290,6 +329,17 @@ export class GameState {
 
     topofstack.card.resolve(topofstack, this);
     this.history.push(topofstack.card.name);
+  }
+
+  doStateBasedActions() {
+    if (this.players.some(_ => _.life <= 0)) {
+      write('one player has lost due to life <= 0');
+      this.gameover = {
+        winner: this.players.find(_ => _.life > 0),
+        loser: this.players.find(_ => _.life <= 0),
+        draw: this.players.every(_ => _.life <= 0)
+      };
+    }
   }
 }
 

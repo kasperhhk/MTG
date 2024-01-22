@@ -3,11 +3,12 @@ import { createInspectCommand } from './commands/inspect';
 import { createPassCommand } from './commands/pass';
 import { createTargetCommand } from './commands/target';
 import { GameState, Player } from './gametypes';
+import { list, write } from './output/util';
 
 function createHelpCommand(commands: Object) {
   const available = Object.keys(commands);
   return () => {
-    console.log(`Available commands:\n\t${available.join('\n\t')}\n`);
+    list(`Available commands:`, available);
   };
 }
 
