@@ -346,7 +346,7 @@ export class GameState {
 
   doStateBasedActions() {
     if (this.players.some(_ => _.life <= 0)) {
-      write('one player has lost due to life <= 0');
+      write('one or more players have lost due to life <= 0');
       this.gameover = {
         winner: this.players.find(_ => _.life > 0),
         loser: this.players.find(_ => _.life <= 0),
