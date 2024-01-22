@@ -229,7 +229,7 @@ export class CastingState {
   }
 
   isValid() {
-    return this.targets.every(_ => isValidTargets(_));
+    return this.targets.length === this.card.targetinginfo.length && this.targets.every(_ => isValidTargets(_));
   }
 
   canTarget(selection: TargetSelection, target: GameObject) {
@@ -338,7 +338,10 @@ export class GameState {
     if (topofstack === undefined) throw 'resolved empty stack';
 
     topofstack.card.resolve(topofstack, this);
-    this.history.push(topofstack.card.name);
+    this.history.push('resolve ' + topofstack.card.name);
+
+    topofstack.caster.graveyard.cards.push(topofstack.card);
+    this.history.push('graveyard ' + topofstack.card.name);
   }
 
   doStateBasedActions() {
