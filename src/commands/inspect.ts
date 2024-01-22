@@ -29,8 +29,10 @@ function inspectObject(gamestate: GameState, player: Player, id: string) {
   const fromBoard = gamestate.board.getObject(id);
   const fromStack = gamestate.stack.find(_ => _.id === id);
   const cardFromStack = gamestate.stack.find(_ => _.card.id === id)?.card;
+  const fromMyGraveyard = player.graveyard.cards.find(_ => _.id === id);
+  const fromOppGraveyard = gamestate.getOpponent(player).graveyard.cards.find(_ => _.id === id);
   
-  const obj = fromHand ?? fromBoard ?? fromStack ?? cardFromStack;
+  const obj = fromHand ?? fromBoard ?? fromStack ?? cardFromStack ?? fromMyGraveyard ?? fromOppGraveyard;
 
   if (obj)
     obj.inspect(gamestate, player);
