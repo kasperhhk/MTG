@@ -11,7 +11,8 @@ const nextId = (() => {
 export enum ObjectType {
   Player = 'Player',
   Card = 'Card',
-  Spell = "Spell"
+  Spell = 'Spell',
+  Creature = 'Creature'
 }
 
 export enum CardType {
@@ -22,7 +23,11 @@ export enum CardType {
 export interface GameObject extends Inspectable {
   id: string,
   name: string,
-  type: ObjectType
+  type: ObjectType,
+}
+
+export interface BoardObject extends GameObject {
+  controller: Player;
 }
 
 export interface Inspectable {
@@ -64,7 +69,54 @@ export abstract class Card implements GameObject {
   toShortString(): string {
     return defaultShortString(this);
   }
+}
 
+export abstract class NonPermanentCard extends Card {
+  abstract resolve(castingState: Spell, gamestate: GameState): void;
+}
+
+export abstract class InstantCard extends NonPermanentCard {
+  constructor(name: string, targetinginfo: TargetingInfo[]) {
+    super(name, CardType.Instant, targetinginfo);
+  }
+}
+
+export abstract class PermanentCard extends Card {
+}
+
+export abstract class CreatureCard extends PermanentCard {
+  constructor(name: string, public power: number, public toughness: number) {
+    super(name, CardType.Creature, []);
+  }
+}
+
+export class CreatureObject implements BoardObject {
+  public id: string;
+  public get name() { return this.card.name; }
+  public type = ObjectType.Creature;
+
+  public damage: number;
+
+  constructor(public card: CreatureCard, public controller: Player) {
+    this.id = nextId();
+    this.damage = 0;
+  }
+
+  inspect(gamestate: GameState, player: Player): void {
+    write(`${this.card.power}/${this.card.toughness} ${this.name} under the control of ${this.controller.toShortString()}`);
+    write(`it has ${this.damage} damage marked on it`);
+  }
+
+  toLongString(): string {
+    return defaultLongString(this) + ` ${this.controller.toShortString()}`;
+  }
+  toShortString(): string {
+    return defaultShortString(this);
+  }
+}
+
+// I dont want to deal with auras right now, they are a bit weird lol
+export abstract class AuraCard extends PermanentCard {
   abstract resolve(castingState: Spell, gamestate: GameState): void;
 }
 
@@ -96,7 +148,7 @@ export class LightningBolt extends Card {
     if (!target) throw 'invalid target';
 
     target.life -= 3;
-    write(`${castingState.caster.name} casts ${this.name} at ${target.name} for 3 damage`);
+    write(`${castingState.controller.name} casts ${this.name} at ${target.name} for 3 damage`);
   }
 }
 
@@ -120,30 +172,36 @@ export class WeirdBolt extends Card {
   resolve(castingState: Spell, gamestate: GameState): void {
     const [first, second] = castingState.targets;
     
-    const firstplayer = first.selected[0] as Player;
-    firstplayer.life -= 1;
-    write(`${this.name} deals 1 damage to ${firstplayer.name}`);
+    if (first.selected[0] instanceof Player) {
+      first.selected[0].life -= 1;
+    }
+    else if (first.selected[0] instanceof CreatureObject) {
+      first.selected[0].damage += 1;
+    }
+    else {
+      throw 'invalid target type';
+    }
+    write(`${this.name} deals 1 damage to ${first.selected[0].toShortString()}`);
 
-    for (let st of second.selected) {
-      const sp = st as Player;
-      sp.life -= 5;
-      write(`${this.name} deals 5 damage to ${sp.name}`);
+    for (let secondtarget of second.selected) {
+      if (secondtarget instanceof Player) {
+        secondtarget.life -= 5;
+      }
+      else if (secondtarget instanceof CreatureObject) {
+        secondtarget.damage += 5;
+      }
+      write(`${this.name} deals 5 damage to ${secondtarget.toShortString()}`);
     }
   }
 }
 
-export class GrizzlyBear extends Card {
+export class GrizzlyBear extends CreatureCard {
   constructor() {
-    super('Grizzly Bear', CardType.Creature, []);
+    super('Grizzly Bear', 2, 2);
   }
 
   getDescription(): string {
-    return '2/2 bear';
-  }
-
-  resolve(castingState: Spell, gamestate: GameState): void {
-    gamestate.board.placeCard(castingState.card);
-    write(`put a 2/2 ${this.name} on the board under the control of ${castingState.caster.toShortString()}`);
+    return `${this.power}/${this.toughness} ${this.name}`;
   }
 }
 
@@ -201,24 +259,51 @@ export class Hand {
   }
 }
 
-export interface TargetSelection {
-  info: TargetingInfo;
-  selected: GameObject[];
+export enum Zone {
+  Player,
+  Board,
+  Hand,
+  Graveyard,
+  Stack,
+  Exile
 }
 
-function isValidTargets(targets: TargetSelection) {
+// TODO: MAKE INTO CLASS
+export interface Target {
+  id: string;
+  zone: Zone;
+}
+
+// TODO: MAKE INTO CLASS
+export interface TargetSelection {
+  info: TargetingInfo;
+  selected: Target[];
+}
+
+function isValidTargetSelection(targets: TargetSelection, gamestate: GameState) {
   if (targets.selected.length < targets.info.min)
     return false;
 
   if (targets.selected.length > targets.info.max)
     return false;
 
-  return targets.selected.every(_ => isValidType(_, targets.info.type));
+  return targets.selected.every(_ => isValidTarget(_, targets.info, gamestate));
+}
+
+function isValidTarget(target: Target, targetingInfo: TargetingInfo, gamestate: GameState) {
+  const [obj, zone] = gamestate.getObject(target.id);
+  if (!obj)
+    return false;
+
+  if (zone !== target.zone)
+    return false;
+
+  return isValidType(obj, targetingInfo.type);
 }
 
 function isValidType(obj: GameObject, type: TargetingType) {
   if (type === TargetingType.Any)
-    return obj instanceof Player;
+    return obj instanceof Player || obj instanceof CreatureObject;
 }
 
 export class CastingState {
@@ -239,7 +324,7 @@ export class CastingState {
       return true;
 
     const current = this.getCurrentSelection();
-    if (!isValidTargets(current))
+    if (!isValidTargetSelection(current))
       return false;
 
     if (this.targets.length < this.card.targetinginfo.length) {
@@ -250,8 +335,19 @@ export class CastingState {
     return true;
   }
 
+  target(obj: GameObject) {
+    const current = this.getCurrentSelection();
+
+    if (isValidType(obj, current.info.type) && current.selected.length < current.info.max) {
+      current.selected.push({ id: obj.id, zone: Zone.hmmm });
+      return true;
+    }
+
+    return false;
+  }
+
   isValid() {
-    return this.targets.length === this.card.targetinginfo.length && this.targets.every(_ => isValidTargets(_));
+    return this.targets.length === this.card.targetinginfo.length && this.targets.every(_ => isValidTargetSelection(_));
   }
 
   canTarget(selection: TargetSelection, target: GameObject) {
@@ -273,12 +369,12 @@ export class Spell implements GameObject {
   public get name(): string { return this.card.name; }
   public type = ObjectType.Spell;
 
-  constructor(public card: Card, public caster: Player, public targets: TargetSelection[]) {
+  constructor(public card: Card, public controller: Player, public targets: TargetSelection[]) {
     this.id = nextId();
   }
 
   inspect(gamestate: GameState, player: Player): void {
-    write(`${this.toLongString()} cast by ${this.caster.toShortString()}`);
+    write(`${this.toLongString()} cast by ${this.controller.toShortString()}`);
     if (this.targets.length) {
       list(`it has the following targets:`, this.targets.flatMap(_ => _.selected.map(__ => __.toLongString())));
     }
@@ -290,6 +386,10 @@ export class Spell implements GameObject {
 
   toShortString(): string {
     return defaultShortString(this);
+  }
+
+  isValid(gamestate: GameState): boolean {
+    return this.targets.every(_ => _.selected.every(t => isValidTarget(t, _.info, gamestate)));
   }
 }
 
@@ -320,6 +420,36 @@ export class GameState {
     this.turn = [1, 0];
     this.stack = [];
     this.casting = null;
+  }
+
+  getObject(id: string, player?: Player): [GameObject, zone: Zone] | [null, null] {
+    const fromHand = this.players.map(p => p.hand.cards.find(_ => _.id === id)).find(_ => _);
+    if (fromHand && (!player || fromHand.owner === player)) {
+      return [fromHand, Zone.Hand];
+    }
+
+    const fromBoard = this.board.getObject(id);
+    if (fromBoard) {
+      return [fromBoard, Zone.Board];
+    }
+
+    const fromStack = this.stack.find(_ => _.id === id);
+    const cardFromStack = this.stack.find(_ => _.card.id === id)?.card;
+    if (fromStack ?? cardFromStack) {
+      return [fromStack ?? cardFromStack, Zone.Stack];
+    }
+
+    const fromGraveyard = this.players.map(p => p.graveyard.cards.find(_ => _.id === id)).find(_ => _);
+    if (fromGraveyard) {
+      return [fromGraveyard, Zone.Graveyard];
+    }
+
+    const fromPlayers = this.players.find(_ => _.id === id);
+    if (fromPlayers) {
+      return [fromPlayers, Zone.Player];
+    }
+
+    return [null, null];
   }
 
   getOpponent(player: Player): Player {
@@ -359,11 +489,23 @@ export class GameState {
     const topofstack = this.stack.pop();
     if (topofstack === undefined) throw 'resolved empty stack';
 
-    topofstack.card.resolve(topofstack, this);
-    this.history.push('resolve ' + topofstack.card.name);
+    if (topofstack.)
 
-    topofstack.caster.graveyard.cards.push(topofstack.card);
-    this.history.push('graveyard ' + topofstack.card.name);
+    if (topofstack.card instanceof NonPermanentCard) {
+      topofstack.card.resolve(topofstack, this);
+      this.history.push('resolve ' + topofstack.name);
+
+      topofstack.controller.graveyard.cards.push(topofstack.card);
+      this.history.push('graveyard ' + topofstack.card.name);
+    }
+    else if (topofstack.card instanceof PermanentCard) {
+      const boardObject = this.board.placeCard(topofstack);
+      this.history.push('resolve ' + topofstack.name);
+      write(`placed ${boardObject.toLongString()} on the board under the control of ${boardObject.controller.toShortString()}`);
+    }
+    else {
+      throw 'card is neither permanent nor non-permanent???';
+    }
   }
 
   doStateBasedActions() {
@@ -375,37 +517,48 @@ export class GameState {
         draw: this.players.every(_ => _.life <= 0)
       };
     }
+
+    const creatures = this.board.getAllObjects().filter(_ => _ instanceof CreatureObject).map(_ => _ as CreatureObject);
+    for (let creature of creatures) {
+      if (creature.damage >= creature.card.toughness) {
+        this.board.remove(creature);
+        creature.card.owner.graveyard.cards.push(creature.card);
+        write(`${creature.card.toShortString()} dies from damage and is moved to the graveyard of ${creature.card.owner.toShortString()}`);
+      }
+    }
   }
 }
 
 export class Board {
-  private objectMap: { [key: string]: GameObject };
-  private objects: GameObject[];
+  private objectMap: { [key: string]: BoardObject };
+  private objects: BoardObject[];
 
   constructor(players: Player[]) {
     this.objectMap = {};
     this.objects = [];
   }
 
-  getAllObjects(): GameObject[] {
+  getAllObjects(): BoardObject[] {
     return this.objects.map(_ => _);
   }
 
-  getObject(id: string): GameObject | undefined {
+  getObject(id: string): BoardObject | undefined {
     return this.objectMap[id];
   }
 
-  placeCard(card: Card) {
-    if (card.cardType === CardType.Creature) {
-      this.objects.push(card);
-      this.objectMap[card.id] = card;
+  placeCard(spell: Spell): BoardObject {
+    if (spell.card instanceof CreatureCard) {
+      const creatureObject = new CreatureObject(spell.card, spell.controller);
+      this.objects.push(creatureObject);
+      this.objectMap[creatureObject.id] = creatureObject;
+      return creatureObject;
     }
     else {
-      throw 'invalid cardtype, can\'t place ' + card.cardType + ' on the board';
+      throw 'invalid cardtype, can\'t place ' + spell.card.cardType + ' on the board';
     }
   }
 
-  remove(object: GameObject) {
+  remove(object: BoardObject) {
     delete this.objectMap[object.id];
     this.objects = this.objects.filter(_ => _ !== object);
   }

@@ -1,4 +1,4 @@
-import { GameState, Player } from '../gametypes';
+import { GameState, Player, Zone } from '../gametypes';
 import { list, write } from '../output/util';
 
 const inspectCommands = {
@@ -27,15 +27,7 @@ function inspectHelp() {
 }
 
 function inspectObject(gamestate: GameState, player: Player, id: string) {
-  const fromHand = player.hand.cards.find(_ => _.id === id);
-  const fromBoard = gamestate.board.getObject(id);
-  const fromStack = gamestate.stack.find(_ => _.id === id);
-  const cardFromStack = gamestate.stack.find(_ => _.card.id === id)?.card;
-  const fromMyGraveyard = player.graveyard.cards.find(_ => _.id === id);
-  const fromOppGraveyard = gamestate.getOpponent(player).graveyard.cards.find(_ => _.id === id);
-  const fromPlayers = gamestate.players.find(_ => _.id === id);
-  
-  const obj = fromHand ?? fromBoard ?? fromStack ?? cardFromStack ?? fromMyGraveyard ?? fromOppGraveyard ?? fromPlayers;
+  const [obj, zone] = gamestate.getObject(id, player);
 
   if (obj)
     obj.inspect(gamestate, player);
